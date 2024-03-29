@@ -1,73 +1,71 @@
-import numpy as np
+import base64
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+from Crypto.Protocol.KDF import scrypt
 import hashlib
+import os
 import mysql.connector
 
-def Calculate(string data[]): # Function for calculate the coins
+def Calculate(data):
+    # 这里是计算逻辑
+    return sum(data)
 
-def Encode(string s):
-    key = get_random_bytes(16)
-    Cipher=AES.new(key,AES.MODE_EAX)
-    message = b'Hello, AES!'
-    ciphertext, tag = cipher.encrypt_and_digest(message)
-    return key,ciphertext
+# 加密模块
+def encode(data, password):
+    salt = get_random_bytes(16)
+    private_key = scrypt(password, salt=salt, n=2**14, r=8, p=1, dklen=32)
+    cipher = AES.new(private_key, AES.MODE_EAX)
+    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
+    return base64.b64encode(salt + cipher.nonce + tag + ciphertext).decode()
 
-def Decode(string s,int key):
-    Cipher=AES.new(key,AES.MODE_EAX)
-    decipher = AES.new(key, AES.MODE_EAX, cipher.nonce)
-    plaintext = decipher.decrypt_and_verify(ciphertext, tag)
-    return plaintext
+# 解密模块
+def decode(encoded_data, password):
+    data = base64.b64decode(encoded_data)
+    salt = data[:16]
+    nonce = data[16:32]
+    tag = data[32:48]
+    ciphertext = data[48:]
+    private_key = scrypt(password, salt=salt, n=2**14, r=8, p=1, dklen=32)
+    cipher = AES.new(private_key, AES.MODE_EAX, nonce=nonce)
+    plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+    return plaintext.decode()
 
-def Hash(string s): # Function for encode
-    hash_object = hashlib.sha256()
+# Hash模块
+def hash_data(data):
+    return hashlib.sha256(data.encode()).hexdigest()
 
-    message = s
-    hash_object.upadate(message)
 
-    hash_value = hash_object.hexdigest()
-    
-    return hash_value
-
-user=""
-password=""
-option=''
-
-with open("user.txt",'r',encoding="UTF-8") as file:
-    for line in file:
-        user=line[0]
-        password=line[1]
-        option= line[2]
-
-if option=='Add':
-    global NewData=[]
-    with open("NewData.txt",'r',encoding="UTF-8") as file:
-        for line in file:
-            NewData.append(line)
-
+# 连接数据库
 conn = mysql.connector.connect(
     host="location",
     user="username",
     password="password",
     database="name"
 )
-
 cursor = conn.cursor()
 
-cursor.excute("SELECT * FROM Data,Key,Hash")
-data=[]
-for row in cursor.fetchall():
-    if Hash(row[0])==row[2]
-        data.append(Decode(row[0],row[1]))
-data.append(NewData)
-key=[]
-hash=[]
-for i in NewData:
-    KEY, newc=Encode(i)
-    key.append(KEY)
-    hash.append(Hash(i))
-cursor.excute("ADD NewData,key,hash FROM Data,Key,Hash")
-cursor.commit()
-coins=Calculate(data)
-cursor.excute("ADD Coins FROM user")
-cursor.commit()
+# 从数据库中检索数据
+cursor.execute("SELECT data, key FROM SQL")
+rows = cursor.fetchall()
+
+# 解密数据
+decrypted_data = [decode(row[0], row[1]) for row in rows]
+
+# 加密新数据并生成hash值
+new_data = "New data" 
+encoded_data = encode(new_data, password)
+data_hash = hash_data(new_data)
+
+# 将新数据插入数据库
+insert_query = "INSERT INTO SQL (data, data_hash) VALUES (%s, %s)"
+cursor.execute(insert_query, (encoded_data, data_hash))
+conn.commit()
+
+# 执行计算模块，并将结果存储到数据库
+calculated_value = Calculate(decrypted_data)  # 假设Calculate是您的计算逻辑
+update_query = "UPDATE SQL SET calculated_value = %s WHERE some_condition"
+cursor.execute(update_query, (calculated_value,))
+conn.commit()
+
+cursor.close()
+conn.close()
