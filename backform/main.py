@@ -5,18 +5,64 @@ from Crypto.Protocol.KDF import scrypt
 import hashlib
 import os
 import mysql.connector
+import subprocess
 
-def Calculate(data):
-    # 这里是计算逻辑
-    return sum(data)
+password = "password"
+
+def mode1(data):
+    NCV = [];FC = [];CC = [];OF = [];Q = [];C = [];M = [];EF = [];F = [];ADe = [];EFe = [];ADh = [];EDh = []
+    with open('table1.csv', 'r') as file:
+        lines = file.readlines()
+        k = 0
+        for line in lines:
+            if k == 0:
+                k = 1
+                continue
+            FC.append(float(line.split(',')[1]));Q.append(float(line.split(',')[2]))
+            C.append(float(line.split(',')[3]));M.append(float(line.split(',')[4]))
+            F.append(float(line.split(',')[5]));ADe.append(float(line.split(',')[6]))
+            EFe.append(float(line.split(',')[7]))
+        
+    with open('tableS1.csv', 'r') as file:
+        lines = file.readlines()
+        k = 0
+        for line in lines:
+            if k == 0:
+                k = 1
+                continue
+            NCV.append(float(line.split(',')[1]));CC.append(float(line.split(',')[2]))
+            OF.append(float(line.split(',')[3]));EF.append(float(line.split(',')[4]))
+            ADh.append(float(line.split(',')[5]));EDh.append(float(line.split(',')[6]))
+            
+    Eburn = 0
+    for i in range(0,len(FC)):
+        Eburn += NCV[i]*FC[i]*CC[i]*OF[i]*44/12
+    Egy1 = Q[0]*C[0]*44/12
+    Egy2 = 0
+    for i in range(0,len(M)):
+        Egy2 += M[i]*EF[i]*F[i]
+    Eeh = ADe[0]*EFe[0]+ADh[0]*EDh[0]
+    
+    return Eburn+Egy1+Egy2+Eeh
+
+# def mode2(data):
+    # same logic as above I'll just write the calculation part
+    
+
+def Calculate(data,Type):
+    if Type == "glass":
+        result = mode1(data)
+    elif Type == "china":
+        result = mode2(data)
+    return result.stdout()
 
 # 加密模块
 def encode(data, password):
     salt = get_random_bytes(16)
     private_key = scrypt(password, salt=salt, n=2**14, r=8, p=1, dklen=32)
     cipher = AES.new(private_key, AES.MODE_EAX)
-    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
-    return base64.b64encode(salt + cipher.nonce + tag + ciphertext).decode()
+    ciphertext, tag = cipher.encrypt_and_digest(data)
+    return base64.b64encode(salt + cipher.nonce + tag + ciphertext)
 
 # 解密模块
 def decode(encoded_data, password):
@@ -32,7 +78,7 @@ def decode(encoded_data, password):
 
 # Hash模块
 def hash_data(data):
-    return hashlib.sha256(data.encode()).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 
 # 连接数据库
@@ -62,7 +108,7 @@ cursor.execute(insert_query, (encoded_data, data_hash))
 conn.commit()
 
 # 执行计算模块，并将结果存储到数据库
-calculated_value = Calculate(decrypted_data)  # 假设Calculate是您的计算逻辑
+calculated_value = Calculate(decrypted_data,Type)  # 假设Calculate是您的计算逻辑
 update_query = "UPDATE SQL SET calculated_value = %s WHERE some_condition"
 cursor.execute(update_query, (calculated_value,))
 conn.commit()
